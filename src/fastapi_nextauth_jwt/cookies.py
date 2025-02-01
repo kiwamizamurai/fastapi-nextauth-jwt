@@ -1,11 +1,10 @@
-from typing import Dict
 from fastapi_nextauth_jwt.exceptions import MissingTokenError
 from fastapi_nextauth_jwt.logger import get_logger
 
 logger = get_logger()
 
 
-def extract_token(cookies: Dict[str, str], cookie_name: str):
+def extract_token(cookies: dict[str, str], cookie_name: str):
     """
     Extracts a potentially chunked token from the cookies of a request.
     It may be in a single cookie, or chunked (with suffixes 0...n)

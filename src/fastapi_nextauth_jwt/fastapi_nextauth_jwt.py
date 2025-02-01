@@ -1,29 +1,34 @@
 import json
+import os
 import typing
 from functools import partial
 from json import JSONDecodeError
+from typing import Any, Literal
 
-import os
-from typing import Set, Any, Literal, List
-
-from starlette.requests import Request
-
+from cryptography.hazmat.primitives import hashes
 from jose import jwe
 from jose.exceptions import JWEError
-from cryptography.hazmat.primitives import hashes
+from starlette.requests import Request
 
-from fastapi_nextauth_jwt.operations import derive_key, check_expiry
 from fastapi_nextauth_jwt.cookies import extract_token
 from fastapi_nextauth_jwt.csrf import extract_csrf_info, validate_csrf_info
-from fastapi_nextauth_jwt.exceptions import InvalidTokenError, MissingTokenError, CSRFMismatchError, \
-    UnsupportedEncryptionAlgorithmException, TokenExpiredException
+from fastapi_nextauth_jwt.exceptions import (
+    CSRFMismatchError,
+    InvalidTokenError,
+    MissingTokenError,
+    TokenExpiredException,
+    UnsupportedEncryptionAlgorithmException,
+)
 from fastapi_nextauth_jwt.logger import get_logger
+from fastapi_nextauth_jwt.operations import check_expiry, derive_key
 
 logger = get_logger()
 
 EncAlgs = Literal["A256CBC-HS512", "A256GCM"]
 _supported_encryption_algs = list(typing.get_args(EncAlgs))
 
+# Define default hash algorithm at module level
+_default_hash_algorithm = hashes.SHA256()
 
 class NextAuthJWT:
     def __init__(self,
@@ -35,10 +40,10 @@ class NextAuthJWT:
                  info: bytes = b"Auth.js Generated Encryption Key",
                  salt: typing.Union[bytes, None] = None,
                  auto_append_salt: bool = True,
-                 hash_algorithm: Any = hashes.SHA256(),
+                 hash_algorithm: Any = _default_hash_algorithm,
                  encryption_algorithm: EncAlgs = "A256CBC-HS512",
                  csrf_prevention_enabled: bool = None,
-                 csrf_methods: Set[str] = None,
+                 csrf_methods: set[str] = None,
                  check_expiry: bool = True):
         """
         Initializes a new instance of the NextAuthJWT class.
@@ -170,7 +175,7 @@ class NextAuthJWT:
 
         try:
             encrypted_token = extract_token(req.cookies, self.cookie_name)
-        except MissingTokenError as e:
+        except MissingTokenError:
             logger.error("Authentication failed: Missing token")
             logger.debug(f"Available cookies: {list(req.cookies.keys())}")
             raise
@@ -186,22 +191,22 @@ class NextAuthJWT:
             logger.debug(f"Attempting to decrypt token (length: {len(encrypted_token)})")
             decrypted_token_string = jwe.decrypt(encrypted_token, self.key)
             logger.debug("Token decryption successful")
-            
+
             try:
                 token = json.loads(decrypted_token_string)
                 logger.debug(f"Token claims: {list(token.keys())}")
             except JSONDecodeError as e:
                 logger.error("Failed to parse decrypted token as JSON")
                 logger.debug(f"Decrypted content (first 100 chars): {decrypted_token_string[:100]}...")
-                raise InvalidTokenError(status_code=401, message=f"Invalid JWT format: JSON parse error - {str(e)}")
-                
+                raise InvalidTokenError(status_code=401, message=f"Invalid JWT format: JSON parse error - {str(e)}") from e
+
         except JWEError as e:
             logger.error(f"Token decryption failed: {str(e)}")
             logger.debug(f"Encryption settings - Algorithm: {self.encryption_algorithm}, Key length: {len(self.key)}")
-            raise InvalidTokenError(status_code=401, message=f"Invalid JWT format: Decryption failed - {str(e)}")
+            raise InvalidTokenError(status_code=401, message=f"Invalid JWT format: Decryption failed - {str(e)}") from e
         except Exception as e:
             logger.error(f"Unexpected error during token processing: {str(e)}")
-            raise InvalidTokenError(status_code=401, message=f"Token processing failed - {str(e)}")
+            raise InvalidTokenError(status_code=401, message=f"Token processing failed - {str(e)}") from e
 
         if self.check_expiry:
             if "exp" not in token:

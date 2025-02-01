@@ -1,5 +1,6 @@
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 import time
+
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from fastapi_nextauth_jwt.exceptions import TokenExpiredException
 from fastapi_nextauth_jwt.logger import get_logger
@@ -44,15 +45,15 @@ def check_expiry(exp: int, cur_time: int = None):
     """
     if cur_time is None:
         cur_time = time.time()
-    
+
     logger.debug(f"Checking token expiry - Expires at: {exp} ({time.ctime(exp)})")
     logger.debug(f"Current time: {cur_time} ({time.ctime(cur_time)})")
-    
+
     time_remaining = exp - cur_time
     if time_remaining < 0:
         logger.warning(f"Token expired {abs(time_remaining):.1f} seconds ago")
         raise TokenExpiredException(403, f"Token expired {abs(time_remaining):.1f} seconds ago")
-    
+
     if time_remaining < 300:  # 5分以内に期限切れ
         logger.warning(f"Token will expire soon. {time_remaining:.1f} seconds remaining")
     else:

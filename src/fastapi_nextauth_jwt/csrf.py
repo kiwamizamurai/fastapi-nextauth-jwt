@@ -1,5 +1,7 @@
 import urllib.parse
+
 from cryptography.hazmat.primitives import hashes
+
 from fastapi_nextauth_jwt.exceptions import InvalidTokenError
 from fastapi_nextauth_jwt.logger import get_logger
 
@@ -36,17 +38,17 @@ def validate_csrf_info(secret: str, csrf_token: str, expected_hash: str):
     :param expected_hash: The expected hash value
     """
     logger.debug("Starting CSRF token validation")
-    
+
     try:
-        csrf_token_bytes = bytes(csrf_token, "ascii")
-        secret_bytes = bytes(secret, "ascii")
+        token_bytes = csrf_token.encode("ascii")
+        secret_bytes = secret.encode("ascii")
     except UnicodeEncodeError as e:
         logger.error("Failed to encode CSRF token or secret as ASCII")
         logger.debug(f"Encoding error details: {str(e)}")
-        raise InvalidTokenError(status_code=401, message="Invalid CSRF token encoding")
+        raise InvalidTokenError(status_code=401, message="Invalid CSRF token encoding") from e
 
     hasher = hashes.Hash(hashes.SHA256())
-    hasher.update(csrf_token_bytes)
+    hasher.update(token_bytes)
     hasher.update(secret_bytes)
     actual_hash = hasher.finalize().hex()
 
