@@ -91,3 +91,67 @@ def test_expiry(monkeypatch):
         client.cookies = cookies
         client.get("/")
         assert exc_info.value.message == "Token Expired"
+
+def test_verify_token():
+    from v5 import JWT
+    # Valid token
+    token = "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwia2lkIjoidDBOWWk4TExkYWVjNlctdlcwN3BRekdUR2dwSmgtaTBLRXlKcHFGcjRqSEkySkRtdDJNTnpqQ0Uwcjc0bDBFT240NmZOMUdMcEpsa09QY0NYZ2JNR3cifQ..VKK_QKVTc0-UxFoOD6ZxZg.pHmOvrG1kCq4IApuJD6lCplq5TBjhxGf_rd43h43kXddPGDwjSEUeRYbcSO-sSfXl8DnXw9Q9e1zJPMlxl1maZRaBV2kAla8kBebL19DPgEDHNVTmW_ujgidlSHk3bbNhOO1U1fXNdvUbQqHOAScjxv60CPJpVd-9CaL6Zw_Teg.S2KOuWV72JtSZca8VhOhQvSFofpKJKVb_jjf_Ld-zWA"
+    # Call verify_token method
+    result = JWT.verify_token(token)
+    # Expected result
+    assert result == expected_jwt
+
+def test_verify_token_invalid():
+    from v5 import JWT
+    # Invalid token
+    invalid_token = "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwia2lkIjoidDBOWWk4TExkYWVjNlctdlcwN3BRekdUR2dwSmgtaTBLRXlKcHFGcjRqSEkySkRtdDJNTnpqQ0Uwcjc0bDBFT240NmZOMUdMcEpsa09QY0NYZ2JNR3cifQ..VKK_QKVTc0-UxFoOD6ZxZg.pHmOvrG1kCq4IApuJD6lCplq5TBjhxGf_rd43h43kXddPGDwjSEUeRYbcSO-sSfXl8DnXw9Q9e1zJPMlxl1maZRaBV2kAla8kBebL19DPgEDHNVTmW_ujgidlSHk3bbNhOO1U1fXNdvUbQqHOAScjxv60CPJpVd-9CaL6Zw_Teg.S2KOuWV72JtSZca8VhOhQvSFofpFJKVb_jjf_Ld-zWA"
+    # Verify that InvalidTokenError is raised when passing an invalid token
+    with pytest.raises(InvalidTokenError) as exc_info:
+        JWT.verify_token(invalid_token)
+    assert exc_info.value.message == "Invalid JWT format"
+
+def test_verify_token_expired(monkeypatch):
+    from v5 import JWT
+    from fastapi_nextauth_jwt.exceptions import TokenExpiredException
+    # Set the time to an expired time
+    # This is the same method used in other tests that works
+    monkeypatch.setattr("fastapi_nextauth_jwt.operations.check_expiry.__defaults__", (1716738975,))
+    # Valid token
+    token = "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwia2lkIjoidDBOWWk4TExkYWVjNlctdlcwN3BRekdUR2dwSmgtaTBLRXlKcHFGcjRqSEkySkRtdDJNTnpqQ0Uwcjc0bDBFT240NmZOMUdMcEpsa09QY0NYZ2JNR3cifQ..VKK_QKVTc0-UxFoOD6ZxZg.pHmOvrG1kCq4IApuJD6lCplq5TBjhxGf_rd43h43kXddPGDwjSEUeRYbcSO-sSfXl8DnXw9Q9e1zJPMlxl1maZRaBV2kAla8kBebL19DPgEDHNVTmW_ujgidlSHk3bbNhOO1U1fXNdvUbQqHOAScjxv60CPJpVd-9CaL6Zw_Teg.S2KOuWV72JtSZca8VhOhQvSFofpKJKVb_jjf_Ld-zWA"
+    # Verify that TokenExpiredException is raised when validating an expired token
+    with pytest.raises(TokenExpiredException) as exc_info:
+        JWT.verify_token(token)
+    assert exc_info.value.message == "Token Expired"
+
+def test_verify_token_with_csrf():
+    from v5 import JWTwCSRF
+    # Even with CSRF enabled instance, the verify_token method does not perform CSRF checks
+    token = "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwia2lkIjoidDBOWWk4TExkYWVjNlctdlcwN3BRekdUR2dwSmgtaTBLRXlKcHFGcjRqSEkySkRtdDJNTnpqQ0Uwcjc0bDBFT240NmZOMUdMcEpsa09QY0NYZ2JNR3cifQ..VKK_QKVTc0-UxFoOD6ZxZg.pHmOvrG1kCq4IApuJD6lCplq5TBjhxGf_rd43h43kXddPGDwjSEUeRYbcSO-sSfXl8DnXw9Q9e1zJPMlxl1maZRaBV2kAla8kBebL19DPgEDHNVTmW_ujgidlSHk3bbNhOO1U1fXNdvUbQqHOAScjxv60CPJpVd-9CaL6Zw_Teg.S2KOuWV72JtSZca8VhOhQvSFofpKJKVb_jjf_Ld-zWA"
+    # Call verify_token method
+    result = JWTwCSRF.verify_token(token)
+    # Expected result
+    assert result == expected_jwt
+
+def test_verify_token_missing_exp(monkeypatch):
+    from v5 import JWT
+    import json
+    from jose import jwe
+    from fastapi_nextauth_jwt.exceptions import InvalidTokenError
+    # Replace jwe.decrypt with a mock function
+    def mock_decrypt(token, key):
+        # Return a JSON string with a fake token data that intentionally lacks an exp field
+        return json.dumps({
+            'name': 'asdf',
+            'email': 'test@test.nl',
+            'sub': '1',
+            'iat': 1714146974,
+            'jti': '9e8f6368-9236-458d-ba23-2bb95fdbfdbd'
+            # exp field is intentionally missing
+        }).encode()
+    monkeypatch.setattr(jwe, "decrypt", mock_decrypt)
+    # Any token string
+    token = "dummy_token"
+    # Verify that InvalidTokenError is raised when validating a token without an exp field
+    with pytest.raises(InvalidTokenError) as exc_info:
+        JWT.verify_token(token)
+    assert exc_info.value.message == "Invalid JWT format, missing exp"

@@ -168,6 +168,21 @@ class NextAuthJWT:
         if csrf_header_token != csrf_cookie_token:
             raise CSRFMismatchError(status_code=401, message="CSRF Token mismatch")
 
+    def verify_token(self, token: str) -> dict:
+        """Verify a JWT token string."""
+        try:
+            decrypted_token_string = jwe.decrypt(token, self.key)
+            token_data = json.loads(decrypted_token_string)
+        except (JWEError, JSONDecodeError) as e:
+            print(e)
+            raise InvalidTokenError(status_code=401, message="Invalid JWT format")
+
+        if self.check_expiry:
+            if "exp" not in token_data:
+                raise InvalidTokenError(status_code=401, message="Invalid JWT format, missing exp")
+            check_expiry(token_data['exp'])
+
+        return token_data
 
 NextAuthJWTv4 = partial(
     NextAuthJWT,
